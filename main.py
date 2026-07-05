@@ -12,37 +12,37 @@ import database
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-    
+        
         # загружаем интерфейс
         ui_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_main.ui")
         loadUi(ui_path, self)
-    
+        
         self.setWindowTitle("Коллекция цитат")
         self.resize(1100, 700)
         self.setMinimumSize(900, 600)
-    
+        
         self.current_image_path = ""
-    
+        
         # инициализация бд
         self.db = database.DatabaseManager()
         self.db.init_db()
-    
+        
         # настройки таблицы
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Цитата", "Автор", "Категория", "Дата", "Избранное"])
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)  # ИСПРАВЛЕНО
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # ИСПРАВЛЕНО
-    
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        
         # заполняем комбобоксы
         self.cb_category.addItems(["Философия", "Юмор", "Мотивация", "Литература", "Другое"])
         self.cb_author.addItems(["Сократ", "Марк Твен", "Оскар Уайльд", "Фридрих Ницше", "Лев Толстой"])
-    
+        
         # настройки для картинки
         self.lbl_portrait.setMinimumSize(250, 250)
         self.lbl_portrait.setMaximumSize(250, 250)
         self.lbl_portrait.setScaledContents(True)
-
+        
         self.connect_signals()
         self.update_table()
     
