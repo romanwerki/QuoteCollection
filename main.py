@@ -13,7 +13,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        # загружаем интерфейс
         ui_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_main.ui")
         loadUi(ui_path, self)
         
@@ -23,22 +22,18 @@ class MainWindow(QMainWindow):
         
         self.current_image_path = ""
         
-        # инициализация бд
         self.db = database.DatabaseManager()
         self.db.init_db()
         
-        # настройки таблицы
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Цитата", "Автор", "Категория", "Дата", "Избранное"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         
-        # заполняем комбобоксы
         self.cb_category.addItems(["Философия", "Юмор", "Мотивация", "Литература", "Другое"])
         self.cb_author.addItems(["Сократ", "Марк Твен", "Оскар Уайльд", "Фридрих Ницше", "Лев Толстой"])
         
-        # настройки для картинки
         self.lbl_portrait.setMinimumSize(250, 250)
         self.lbl_portrait.setMaximumSize(250, 250)
         self.lbl_portrait.setScaledContents(True)
@@ -47,7 +42,6 @@ class MainWindow(QMainWindow):
         self.update_table()
     
     def connect_signals(self):
-        # привязываем кнопки
         self.btn_add.clicked.connect(self.add_quote)
         self.btn_edit.clicked.connect(self.edit_quote)
         self.btn_delete.clicked.connect(self.delete_quote)
@@ -56,13 +50,11 @@ class MainWindow(QMainWindow):
         self.table.itemSelectionChanged.connect(self.select_row)
     
     def add_quote(self):
-        # проверка текста
         text = self.te_text.toPlainText().strip()
         if not text:
             QMessageBox.warning(self, "Ошибка", "Введите текст цитаты")
             return
         
-        # проверка даты
         if self.de_date.date() > QDate.currentDate():
             QMessageBox.warning(self, "Ошибка", "Дата не может быть в будущем")
             return
@@ -146,27 +138,22 @@ class MainWindow(QMainWindow):
         row = selected[0].row()
         self.te_text.setPlainText(self.table.item(row, 0).text())
         
-        # устанавливаем автора
         author = self.table.item(row, 1).text()
         index = self.cb_author.findText(author)
         if index >= 0:
             self.cb_author.setCurrentIndex(index)
         
-        # категорию
         category = self.table.item(row, 2).text()
         index = self.cb_category.findText(category)
         if index >= 0:
             self.cb_category.setCurrentIndex(index)
         
-        # дату
         date_str = self.table.item(row, 3).text()
         if date_str:
             self.de_date.setDate(QDate.fromString(date_str, "yyyy-MM-dd"))
         
-        # избранное
         self.chk_favorite.setChecked(self.table.item(row, 4).text() == "✓")
         
-        # картинку
         image_path = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole + 1)
         if image_path:
             self.load_portrait(image_path)
@@ -179,13 +166,24 @@ class MainWindow(QMainWindow):
         self.load_portrait(path)
     
     def load_portrait(self, path):
+        if not os.path.exists(path):
+            QMessageBox.warning(self, "Ошибка", "Файл не найден")
+            return
+        
         try:
             img = Image.open(path).convert("RGBA")
+            
+            if img.size[0] < 50 or img.size[1] < 50:
+                QMessageBox.warning(self, "Ошибка", "Изображение слишком маленькое")
+                return
+            
             img = img.resize((250, 250), Image.LANCZOS)
             
             qt_img = QImage(img.tobytes(), img.width, img.height, QImage.Format.Format_RGBA8888)
             pixmap = QPixmap.fromImage(qt_img)
             self.lbl_portrait.setPixmap(pixmap)
+            self.lbl_portrait.setStyleSheet("background-color: #fff; border: 2px solid #999; border-radius: 8px;")
+            
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить: {e}")
     
@@ -195,7 +193,6 @@ class MainWindow(QMainWindow):
         for i, rec in enumerate(records):
             self.table.insertRow(i)
             
-            # обрезаем длинный текст
             text = rec["text"]
             if len(text) > 50:
                 text = text[:50] + "..."
@@ -208,7 +205,6 @@ class MainWindow(QMainWindow):
             fav = "✓" if rec["is_favorite"] else ""
             self.table.setItem(i, 4, QTableWidgetItem(fav))
             
-            # сохраняем id
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, rec["id"])
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole + 1, rec["image_path"])
     
