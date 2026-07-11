@@ -19,9 +19,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class MainWindow(QMainWindow):                            #Главное окно приложения 'Коллекция цитат'
+class MainWindow(QMainWindow):
+    """Главное окно приложения 'Коллекция цитат'."""
     
-    def __init__(self):               #Инициализация главного окна и загрузка UI
+    def __init__(self):
+        """Инициализация главного окна и загрузка UI."""
         super().__init__()
         
         ui_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_main.ui")
@@ -43,7 +45,8 @@ class MainWindow(QMainWindow):                            #Главное окн
         
         logger.info("Приложение инициализировано")
     
-    def _setup_ui(self):               #Настройка виджетов интерфейса (таблица, комбобоксы, портрет, дата)
+    def _setup_ui(self):
+        """Настройка виджетов интерфейса: таблица, комбобоксы, портрет, дата."""
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Цитата", "Автор", "Категория", "Дата", "Избранное"])
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -59,7 +62,8 @@ class MainWindow(QMainWindow):                            #Главное окн
         
         self.de_date.setDate(QDate.currentDate())
     
-    def _bind_signals(self):               #Привязка сигналов виджетов к слотам-обработчикам
+    def _bind_signals(self):
+        """Привязка сигналов виджетов к слотам-обработчикам."""
         self.btn_add.clicked.connect(self.add_quote)
         self.btn_edit.clicked.connect(self.edit_quote)
         self.btn_delete.clicked.connect(self.delete_quote)
@@ -68,7 +72,8 @@ class MainWindow(QMainWindow):                            #Главное окн
         self.btn_clear.clicked.connect(self.clear_form)
         self.table.itemSelectionChanged.connect(self.select_row)
     
-    def add_quote(self):               #Добавление новой цитаты в базу данных с валидацией
+    def add_quote(self):
+        """Добавление новой цитаты в базу данных с валидацией."""
         text = self.te_text.toPlainText().strip()
         if not text:
             logger.warning("Попытка добавить пустую цитату")
@@ -95,7 +100,8 @@ class MainWindow(QMainWindow):                            #Главное окн
         self.clear_form()
         QMessageBox.information(self, "Готово", "Цитата добавлена")
     
-    def edit_quote(self):                 #Редактирование выбранной цитаты
+    def edit_quote(self):
+        """Редактирование выбранной цитаты."""
         selected = self.table.selectionModel().selectedRows()
         if not selected:
             QMessageBox.warning(self, "Внимание", "Выберите цитату")
@@ -123,7 +129,8 @@ class MainWindow(QMainWindow):                            #Главное окн
         self.update_table()
         QMessageBox.information(self, "Готово", "Изменения сохранены")
     
-    def delete_quote(self):                 #Удаление выбранной цитаты с подтверждением
+    def delete_quote(self):
+        """Удаление выбранной цитаты с подтверждением."""
         selected = self.table.selectionModel().selectedRows()
         if not selected:
             QMessageBox.warning(self, "Внимание", "Выберите цитату")
@@ -139,7 +146,8 @@ class MainWindow(QMainWindow):                            #Главное окн
             self.update_table()
             self.clear_form()
     
-    def copy_quote(self):                    #Копирование выбранной цитаты в буфер обмена
+    def copy_quote(self):
+        """Копирование выбранной цитаты в буфер обмена."""
         selected = self.table.selectionModel().selectedRows()
         if not selected:
             QMessageBox.warning(self, "Внимание", "Выберите цитату")
@@ -154,7 +162,8 @@ class MainWindow(QMainWindow):                            #Главное окн
         logger.info("Цитата скопирована в буфер обмена")
         QMessageBox.information(self, "Готово", "Скопировано в буфер")
     
-    def select_row(self):                #Заполнение формы данными выбранной строки таблицы
+    def select_row(self):
+        """Заполнение формы данными выбранной строки таблицы."""
         selected = self.table.selectionModel().selectedRows()
         if not selected:
             self.clear_form()
@@ -183,14 +192,16 @@ class MainWindow(QMainWindow):                            #Главное окн
         if image_path:
             self.load_portrait(image_path)
     
-    def load_image(self):                 #Открытие диалога выбора изображения портрета
+    def load_image(self):
+        """Открытие диалога выбора изображения портрета."""
         path, _ = QFileDialog.getOpenFileName(self, "Выберите портрет", "", "Images (*.png *.jpg *.jpeg)")
         if not path:
             return
         self.current_image_path = path
         self.load_portrait(path)
     
-    def load_portrait(self, path):              #Загрузка, масштабирование и отображение портрета через Pillow
+    def load_portrait(self, path):
+        """Загрузка, масштабирование и отображение портрета через Pillow."""
         if not os.path.exists(path):
             QMessageBox.warning(self, "Ошибка", "Файл не найден")
             return
@@ -212,7 +223,8 @@ class MainWindow(QMainWindow):                            #Главное окн
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить: {e}")
             logger.error(f"Ошибка загрузки изображения: {e}")
     
-    def update_table(self):              #Обновление таблицы цитат данными из базы
+    def update_table(self):
+        """Обновление таблицы цитат данными из базы."""
         self.table.setRowCount(0)
         records = self.db.get_all()
         for i, rec in enumerate(records):
@@ -233,7 +245,8 @@ class MainWindow(QMainWindow):                            #Главное окн
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole, rec["id"])
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole + 1, rec["image_path"])
     
-    def clear_form(self):             #Очистка всех полей формы ввода
+    def clear_form(self):
+        """Очистка всех полей формы ввода."""
         self.te_text.clear()
         self.cb_author.setCurrentIndex(0)
         self.cb_category.setCurrentIndex(0)
@@ -242,7 +255,8 @@ class MainWindow(QMainWindow):                            #Главное окн
         self.lbl_portrait.clear()
         self.current_image_path = ""
     
-    def closeEvent(self, event):                    #Обработка закрытия окна с подтверждением
+    def closeEvent(self, event):
+        """Обработка закрытия окна с подтверждением."""
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("Выход")
         msg_box.setText("Закрыть программу?")
@@ -272,7 +286,8 @@ class MainWindow(QMainWindow):                            #Главное окн
         else:
             event.ignore()
 
-    def apply_styles(self):              #Применение QSS стилизации
+    def apply_styles(self):
+        """Применение QSS стилизации ко всем виджетам."""
         self.setStyleSheet("""
         QMainWindow {
             background-color: #f5f5f5;
@@ -365,7 +380,8 @@ class MainWindow(QMainWindow):                            #Главное окн
     """)
 
 
-def main():   #Точка входа в приложение
+def main():
+    """Точка входа в приложение."""
     app = QApplication(sys.argv)
     
     def handle_exception(exc_type, exc_value, exc_traceback):
