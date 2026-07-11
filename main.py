@@ -311,7 +311,7 @@ class MainWindow(QMainWindow):
             event.ignore()
 
     def apply_styles(self):
-        """QSS стилизация с исправлением кнопок даты и диалогов"""
+        """QSS стилизация"""
         self.setStyleSheet("""
         QMainWindow {
             background-color: #f5f5f5;
