@@ -1,5 +1,6 @@
 import sys
 import os
+import logging
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QMessageBox, 
                               QFileDialog, QTableWidgetItem, QTableWidget)
 from PyQt6.QtCore import Qt, QDate
@@ -7,6 +8,16 @@ from PyQt6.QtGui import QFont, QPixmap, QImage
 from PyQt6.uic import loadUi
 from PIL import Image
 import database
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -38,8 +49,13 @@ class MainWindow(QMainWindow):
         self.lbl_portrait.setMaximumSize(250, 250)
         self.lbl_portrait.setScaledContents(True)
         
+        self.de_date.setDate(QDate.currentDate())
+        
         self.connect_signals()
+        self.apply_styles()
         self.update_table()
+        
+        logger.info("Приложение инициализировано")
     
     def connect_signals(self):
         self.btn_add.clicked.connect(self.add_quote)
@@ -47,15 +63,18 @@ class MainWindow(QMainWindow):
         self.btn_delete.clicked.connect(self.delete_quote)
         self.btn_copy.clicked.connect(self.copy_quote)
         self.btn_load_image.clicked.connect(self.load_image)
+        self.btn_clear.clicked.connect(self.clear_form)
         self.table.itemSelectionChanged.connect(self.select_row)
     
     def add_quote(self):
         text = self.te_text.toPlainText().strip()
         if not text:
+            logger.warning("Попытка добавить пустую цитату")
             QMessageBox.warning(self, "Ошибка", "Введите текст цитаты")
             return
         
         if self.de_date.date() > QDate.currentDate():
+            logger.warning("Попытка установить будущую дату")
             QMessageBox.warning(self, "Ошибка", "Дата не может быть в будущем")
             return
         
@@ -69,6 +88,7 @@ class MainWindow(QMainWindow):
         }
         
         self.db.insert_quote(data)
+        logger.info(f"Добавлена цитата: {text[:30]}...")
         self.update_table()
         self.clear_form()
         QMessageBox.information(self, "Готово", "Цитата добавлена")
@@ -97,6 +117,7 @@ class MainWindow(QMainWindow):
         }
         
         self.db.update_quote(data)
+        logger.info(f"Изменена цитата ID: {quote_id}")
         self.update_table()
         QMessageBox.information(self, "Готово", "Изменения сохранены")
     
@@ -112,6 +133,7 @@ class MainWindow(QMainWindow):
             row = selected[0].row()
             quote_id = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
             self.db.delete_quote(quote_id)
+            logger.info(f"Удалена цитата ID: {quote_id}")
             self.update_table()
             self.clear_form()
     
@@ -127,6 +149,7 @@ class MainWindow(QMainWindow):
         
         clipboard = QApplication.clipboard()
         clipboard.setText(f'"{text}" — {author}')
+        logger.info("Цитата скопирована в буфер обмена")
         QMessageBox.information(self, "Готово", "Скопировано в буфер")
     
     def select_row(self):
@@ -182,10 +205,10 @@ class MainWindow(QMainWindow):
             qt_img = QImage(img.tobytes(), img.width, img.height, QImage.Format.Format_RGBA8888)
             pixmap = QPixmap.fromImage(qt_img)
             self.lbl_portrait.setPixmap(pixmap)
-            self.lbl_portrait.setStyleSheet("background-color: #fff; border: 2px solid #999; border-radius: 8px;")
             
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить: {e}")
+            logger.error(f"Ошибка загрузки изображения: {e}")
     
     def update_table(self):
         self.table.setRowCount(0)
@@ -218,23 +241,147 @@ class MainWindow(QMainWindow):
         self.current_image_path = ""
     
     def closeEvent(self, event):
-        reply = QMessageBox.question(self, "Выход", "Закрыть программу?",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Выход")
+        msg_box.setText("Закрыть программу?")
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+        msg_box.setStyleSheet("""
+        QMessageBox {
+            background-color: white;
+            color: black;
+        }
+        QPushButton {
+            background-color: #4a90e2;
+            color: white;
+            border: 1px solid #357abd;
+            border-radius: 3px;
+            padding: 5px 15px;
+        }
+        QPushButton:hover {
+            background-color: #357abd;
+        }
+        """)
+        reply = msg_box.exec()
+
         if reply != QMessageBox.StandardButton.Cancel:
             self.db.close()
+            logger.info("Приложение закрыто")
             event.accept()
         else:
             event.ignore()
 
+    def apply_styles(self):
+        """QSS стилизация с исправлением кнопок даты и диалогов"""
+        self.setStyleSheet("""
+        QMainWindow {
+            background-color: #f5f5f5;
+        }
+        
+        QTextEdit, QComboBox, QDateEdit {
+            background-color: white;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+            padding: 3px;
+            color: black;
+        }
+        
+        QComboBox QAbstractItemView {
+            background-color: white;
+            color: black;
+            selection-background-color: #4a90e2;
+            selection-color: white;
+        }
+        
+        QPushButton {
+            background-color: #4a90e2;
+            color: white;
+            border: 1px solid #357abd;
+            border-radius: 3px;
+        }
+        
+        QPushButton:hover {
+            background-color: #357abd;
+        }
+        
+        QTableWidget {
+            background-color: white;
+            border: 1px solid #aaa;
+            gridline-color: #ddd;
+            color: black;
+        }
+        
+        QHeaderView::section {
+            background-color: #4a5568;
+            color: white;
+            padding: 4px;
+            border: none;
+        }
+        
+        QCheckBox, QLabel {
+            color: black;
+        }
+        
+        /* Исправление кнопок даты - убираем transparent */
+        QDateEdit::up-button, QDateEdit::down-button {
+            width: 16px;
+            background-color: white;
+            border: 1px solid #aaa;
+        }
+        
+        QDateEdit::up-button:hover, QDateEdit::down-button:hover {
+            background-color: #e0e0e0;
+        }
+        
+        /* Стили для диалогов */
+        QMessageBox {
+            background-color: white;
+        }
+        
+        QMessageBox QLabel {
+            color: black;
+            background-color: white;
+        }
+        
+        QMessageBox QPushButton {
+            background-color: #4a90e2;
+            color: white;
+            border: 1px solid #357abd;
+            border-radius: 3px;
+            padding: 5px 15px;
+        }
+        
+        QMessageBox QPushButton:hover {
+            background-color: #357abd;
+        }
+
+        QDateEdit::up-button, QDateEdit::down-button {
+            width: 0;
+            height: 0;
+        }
+
+        QFileDialog {
+            background-color: white;
+            color: black;
+        }
+    """)
+
 
 def main():
     app = QApplication(sys.argv)
+    
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        logger.error("Необработанное исключение", exc_info=(exc_type, exc_value, exc_traceback))
+        QMessageBox.critical(None, "Ошибка", f"Произошла ошибка:\n{exc_value}")
+    
+    sys.excepthook = handle_exception
+    
     app.setApplicationName("QuotesCollection")
-    app.setFont(QFont("Segoe UI", 10))
+    app.setFont(QFont("Segoe UI", 9))
     
     window = MainWindow()
     window.show()
     
+    logger.info("Приложение запущено")
     sys.exit(app.exec())
 
 
