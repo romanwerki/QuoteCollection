@@ -1,9 +1,10 @@
 import sys
 import os
 import logging
+import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QFileDialog, QTableWidgetItem, QTableWidget)
-from PyQt6.QtCore import Qt, QDate
-from PyQt6.QtGui import QFont, QPixmap, QImage
+from PyQt6.QtCore import Qt, QDate, QSettings
+from PyQt6.QtGui import QFont, QPixmap, QImage, QKeySequence, QShortcut
 from PyQt6.uic import loadUi
 from PIL import Image
 import database
@@ -20,10 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
-    """Главное окно приложения 'Коллекция цитат'."""
-    
     def __init__(self):
-        """Инициализация главного окна и загрузка UI."""
         super().__init__()
         
         ui_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_main.ui")
@@ -38,15 +36,6 @@ class MainWindow(QMainWindow):
         self.db = database.DatabaseManager()
         self.db.init_db()
         
-        self._setup_ui()
-        self._bind_signals()
-        self.apply_styles()
-        self.update_table()
-        
-        logger.info("Приложение инициализировано")
-    
-    def _setup_ui(self):
-        """Настройка виджетов интерфейса: таблица, комбобоксы, портрет, дата."""
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Цитата", "Автор", "Категория", "Дата", "Избранное"])
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -61,9 +50,16 @@ class MainWindow(QMainWindow):
         self.lbl_portrait.setScaledContents(True)
         
         self.de_date.setDate(QDate.currentDate())
+        
+        self.connect_signals()
+        self.setup_shortcuts()
+        self.load_settings()
+        self.apply_styles()
+        self.update_table()
+        
+        logger.info("Приложение инициализировано")
     
-    def _bind_signals(self):
-        """Привязка сигналов виджетов к слотам-обработчикам."""
+    def connect_signals(self):
         self.btn_add.clicked.connect(self.add_quote)
         self.btn_edit.clicked.connect(self.edit_quote)
         self.btn_delete.clicked.connect(self.delete_quote)
@@ -72,8 +68,44 @@ class MainWindow(QMainWindow):
         self.btn_clear.clicked.connect(self.clear_form)
         self.table.itemSelectionChanged.connect(self.select_row)
     
+    def setup_shortcuts(self):
+        """Бонус: горячие клавиши"""
+        QShortcut(QKeySequence("Ctrl+N"), self, self.clear_form)
+        QShortcut(QKeySequence("Ctrl+D"), self, self.delete_quote)
+        QShortcut(QKeySequence("F5"), self, self.update_table)
+        QShortcut(QKeySequence("Ctrl+E"), self, self.export_to_json)
+    
+    def load_settings(self):
+        """Бонус: загрузка размера окна"""
+        settings = QSettings("QuoteCollection", "MainWindow")
+        geometry = settings.value("geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+    
+    def save_settings(self):
+        """Бонус: сохранение размера окна"""
+        settings = QSettings("QuoteCollection", "MainWindow")
+        settings.setValue("geometry", self.saveGeometry())
+    
+    def export_to_json(self):
+        """Бонус: экспорт всех цитат в JSON"""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Экспорт в JSON", "", "JSON files (*.json)"
+        )
+        if not path:
+            return
+        try:
+            records = self.db.get_all()
+            data = [dict(rec) for rec in records]
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            QMessageBox.information(self, "Готово", f"Экспортировано {len(data)} записей")
+            logger.info(f"Экспорт в JSON: {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось экспортировать: {e}")
+            logger.error(f"Ошибка экспорта: {e}")
+    
     def add_quote(self):
-        """Добавление новой цитаты в базу данных с валидацией."""
         text = self.te_text.toPlainText().strip()
         if not text:
             logger.warning("Попытка добавить пустую цитату")
@@ -101,7 +133,6 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Готово", "Цитата добавлена")
     
     def edit_quote(self):
-        """Редактирование выбранной цитаты."""
         selected = self.table.selectionModel().selectedRows()
         if not selected:
             QMessageBox.warning(self, "Внимание", "Выберите цитату")
@@ -130,7 +161,6 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Готово", "Изменения сохранены")
     
     def delete_quote(self):
-        """Удаление выбранной цитаты с подтверждением."""
         selected = self.table.selectionModel().selectedRows()
         if not selected:
             QMessageBox.warning(self, "Внимание", "Выберите цитату")
@@ -147,7 +177,6 @@ class MainWindow(QMainWindow):
             self.clear_form()
     
     def copy_quote(self):
-        """Копирование выбранной цитаты в буфер обмена."""
         selected = self.table.selectionModel().selectedRows()
         if not selected:
             QMessageBox.warning(self, "Внимание", "Выберите цитату")
@@ -163,7 +192,6 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Готово", "Скопировано в буфер")
     
     def select_row(self):
-        """Заполнение формы данными выбранной строки таблицы."""
         selected = self.table.selectionModel().selectedRows()
         if not selected:
             self.clear_form()
@@ -193,7 +221,6 @@ class MainWindow(QMainWindow):
             self.load_portrait(image_path)
     
     def load_image(self):
-        """Открытие диалога выбора изображения портрета."""
         path, _ = QFileDialog.getOpenFileName(self, "Выберите портрет", "", "Images (*.png *.jpg *.jpeg)")
         if not path:
             return
@@ -201,7 +228,6 @@ class MainWindow(QMainWindow):
         self.load_portrait(path)
     
     def load_portrait(self, path):
-        """Загрузка, масштабирование и отображение портрета через Pillow."""
         if not os.path.exists(path):
             QMessageBox.warning(self, "Ошибка", "Файл не найден")
             return
@@ -224,7 +250,6 @@ class MainWindow(QMainWindow):
             logger.error(f"Ошибка загрузки изображения: {e}")
     
     def update_table(self):
-        """Обновление таблицы цитат данными из базы."""
         self.table.setRowCount(0)
         records = self.db.get_all()
         for i, rec in enumerate(records):
@@ -246,7 +271,6 @@ class MainWindow(QMainWindow):
             self.table.item(i, 0).setData(Qt.ItemDataRole.UserRole + 1, rec["image_path"])
     
     def clear_form(self):
-        """Очистка всех полей формы ввода."""
         self.te_text.clear()
         self.cb_author.setCurrentIndex(0)
         self.cb_category.setCurrentIndex(0)
@@ -256,7 +280,6 @@ class MainWindow(QMainWindow):
         self.current_image_path = ""
     
     def closeEvent(self, event):
-        """Обработка закрытия окна с подтверждением."""
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("Выход")
         msg_box.setText("Закрыть программу?")
@@ -280,6 +303,7 @@ class MainWindow(QMainWindow):
         reply = msg_box.exec()
 
         if reply != QMessageBox.StandardButton.Cancel:
+            self.save_settings()
             self.db.close()
             logger.info("Приложение закрыто")
             event.accept()
@@ -287,7 +311,7 @@ class MainWindow(QMainWindow):
             event.ignore()
 
     def apply_styles(self):
-        """Применение QSS стилизации ко всем виджетам."""
+        """QSS стилизация с исправлением кнопок даты и диалогов"""
         self.setStyleSheet("""
         QMainWindow {
             background-color: #f5f5f5;
@@ -381,7 +405,6 @@ class MainWindow(QMainWindow):
 
 
 def main():
-    """Точка входа в приложение."""
     app = QApplication(sys.argv)
     
     def handle_exception(exc_type, exc_value, exc_traceback):
